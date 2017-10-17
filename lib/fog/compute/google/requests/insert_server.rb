@@ -219,6 +219,11 @@ module Fog
           }
           body_object = { :name => server_name }
 
+          if options.key? "guestAccelerators"
+            if options["machineType"] == "f1-micro" or options["machineType"] == "g1-small"
+              raise ArgumentError.new "GPUs aren't available for shared vCPUs"
+            end
+          end
           body_object["machineType"] = @api_url + @project + "/zones/#{zone_name}/machineTypes/#{options.delete 'machineType'}"
 
           scheduling = {
@@ -243,7 +248,18 @@ module Fog
             scheduling["onHostMaintenance"] = (ohm.respond_to?("upcase") &&
                     ohm.upcase == "MIGRATE" && "MIGRATE") || "TERMINATE"
           end
+          if options.key? "guestAccelerators"
+            scheduling["onHostMaintenance"] = "TERMINATE"
+          end
           body_object["scheduling"] = scheduling
+
+          if options.key? "guestAccelerators"
+            guestAccelerators = {}
+            guestAccelerators["acceleratorType"] = @api_url + @project + "/zones/#{zone_name}/acceleratorTypes/#{options['guestAccelerators'][0].delete 'acceleratorType'}"
+            guestAccelerators["acceleratorCount"] = options["guestAccelerators"][0]["acceleratorCount"] ? options["guestAccelerators"][0]["acceleratorCount"] : 1
+            body_object["guestAccelerators"] = [ guestAccelerators ]
+            options.delete 'guestAccelerators'
+          end
 
           # @see https://developers.google.com/compute/docs/networking#canipforward
           if options.key? "can_ip_forward"
